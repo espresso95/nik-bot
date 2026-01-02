@@ -4,51 +4,74 @@
 #include "pins.h"
 
 // WiFi bridge to ESP32-CAM module via UART
-// The ESP32-CAM should be programmed with AT command firmware or custom firmware
-// that responds to simple commands over serial communication.
+// The ESP32-CAM is connected to hardware serial (D0/D1) on the Zeus Car Shield.
+// IMPORTANT: Disconnect ESP32-CAM or disable this component during sketch upload
+// to avoid conflicts with USB programming which also uses hardware serial.
 class WifiBridge {
  public:
-  // Note: Hardware Serial (pins 0,1) is shared with USB programming.
-  // Using SoftwareSerial on different pins for ESP32 communication is recommended.
-  // However, if hardware serial is used, disconnect ESP32 during upload.
-  WifiBridge(uint8_t rx_pin = 10, uint8_t tx_pin = 11, long baud_rate = 9600)
-      : rx_pin_(rx_pin), tx_pin_(tx_pin), baud_rate_(baud_rate), 
-        serial_(nullptr), connected_(false) {}
+  // Constructor for Hardware Serial (default, as ESP32-CAM is wired to D0/D1)
+  // Note: serial_ptr will be set to &Serial in begin() when using hardware serial
+  WifiBridge(long baud_rate = 9600)
+      : baud_rate_(baud_rate), use_hardware_serial_(true),
+        software_serial_(nullptr), connected_(false) {}
+  
+  // Constructor for Software Serial (alternative, for custom wiring)
+  WifiBridge(uint8_t rx_pin, uint8_t tx_pin, long baud_rate = 9600)
+      : rx_pin_(rx_pin), tx_pin_(tx_pin), baud_rate_(baud_rate),
+        use_hardware_serial_(false), software_serial_(nullptr), connected_(false) {}
 
   ~WifiBridge() {
-    if (serial_ != nullptr) {
-      delete serial_;
+    if (software_serial_ != nullptr) {
+      software_serial_->end();
+      delete software_serial_;
     }
   }
 
   void begin() {
-    // Initialize software serial for ESP32 communication
-    serial_ = new SoftwareSerial(rx_pin_, tx_pin_);
-    serial_->begin(baud_rate_);
-    delay(100);  // Allow ESP32 to stabilize
-    
-    // Clear any pending data
-    while (serial_->available()) {
-      serial_->read();
+    if (use_hardware_serial_) {
+      // Using hardware serial (D0/D1) - ESP32-CAM default connection
+      Serial.begin(baud_rate_);
+      delay(100);  // Allow ESP32 to stabilize
+      
+      // Clear any pending data
+      while (Serial.available()) {
+        Serial.read();
+      }
+    } else {
+      // Using software serial on custom pins
+      software_serial_ = new SoftwareSerial(rx_pin_, tx_pin_);
+      software_serial_->begin(baud_rate_);
+      delay(100);  // Allow ESP32 to stabilize
+      
+      // Clear any pending data
+      while (software_serial_->available()) {
+        software_serial_->read();
+      }
     }
+  }
+
+  // Helper to get the active serial stream
+  Stream* getSerial() {
+    return use_hardware_serial_ ? (Stream*)&Serial : (Stream*)software_serial_;
   }
 
   // Send a command to ESP32 and wait for response
   bool sendCommand(const char* command, uint16_t timeout_ms = 1000) {
-    if (serial_ == nullptr) return false;
+    Stream* serial = getSerial();
+    if (serial == nullptr) return false;
     
     // Clear buffer
-    while (serial_->available()) {
-      serial_->read();
+    while (serial->available()) {
+      serial->read();
     }
     
     // Send command
-    serial_->println(command);
+    serial->println(command);
     
     // Wait for response
     unsigned long start = millis();
     while (millis() - start < timeout_ms) {
-      if (serial_->available()) {
+      if (serial->available()) {
         return true;
       }
       delay(10);
@@ -58,7 +81,13 @@ class WifiBridge {
 
   // Connect to WiFi network
   bool connect(const char* ssid, const char* password, uint16_t timeout_ms = 10000) {
-    if (serial_ == nullptr) return false;
+    Stream* serial = getSerial();
+    if (serial == nullptr) return false;
+    
+    // Validate input lengths to prevent buffer overflow
+    if (strlen(ssid) > 32 || strlen(password) > 63) {
+      return false;  // Invalid WiFi credentials length
+    }
     
     // Format: WIFI_CONNECT:ssid,password
     char cmd[128];
@@ -73,7 +102,8 @@ class WifiBridge {
 
   // Disconnect from WiFi
   void disconnect() {
-    if (serial_ == nullptr) return;
+    Stream* serial = getSerial();
+    if (serial == nullptr) return;
     sendCommand("WIFI_DISCONNECT");
     connected_ = false;
   }
@@ -85,7 +115,8 @@ class WifiBridge {
 
   // Get IP address (returns via response parameter)
   bool getIpAddress(char* ip_buffer, size_t buffer_size, uint16_t timeout_ms = 2000) {
-    if (serial_ == nullptr || !connected_) return false;
+    Stream* serial = getSerial();
+    if (serial == nullptr || !connected_) return false;
     
     sendCommand("GET_IP");
     return readResponse(ip_buffer, buffer_size, timeout_ms);
@@ -93,7 +124,13 @@ class WifiBridge {
 
   // Send HTTP GET request
   bool httpGet(const char* url, char* response_buffer, size_t buffer_size, uint16_t timeout_ms = 5000) {
-    if (serial_ == nullptr || !connected_) return false;
+    Stream* serial = getSerial();
+    if (serial == nullptr || !connected_) return false;
+    
+    // Validate URL length to prevent buffer overflow
+    if (strlen(url) > 200) {
+      return false;  // URL too long
+    }
     
     char cmd[256];
     snprintf(cmd, sizeof(cmd), "HTTP_GET:%s", url);
@@ -106,7 +143,13 @@ class WifiBridge {
 
   // Send HTTP POST request
   bool httpPost(const char* url, const char* data, char* response_buffer, size_t buffer_size, uint16_t timeout_ms = 5000) {
-    if (serial_ == nullptr || !connected_) return false;
+    Stream* serial = getSerial();
+    if (serial == nullptr || !connected_) return false;
+    
+    // Validate combined length to prevent buffer overflow
+    if (strlen(url) + strlen(data) > 300) {
+      return false;  // Combined URL and data too long
+    }
     
     char cmd[384];
     snprintf(cmd, sizeof(cmd), "HTTP_POST:%s|%s", url, data);
@@ -119,29 +162,39 @@ class WifiBridge {
 
   // Read available data from serial
   int available() const {
-    return (serial_ != nullptr) ? serial_->available() : 0;
+    if (use_hardware_serial_) {
+      return Serial.available();
+    }
+    return (software_serial_ != nullptr) ? software_serial_->available() : 0;
   }
 
   // Read a single byte
   int read() {
-    return (serial_ != nullptr) ? serial_->read() : -1;
+    if (use_hardware_serial_) {
+      return Serial.read();
+    }
+    return (software_serial_ != nullptr) ? software_serial_->read() : -1;
   }
 
   // Write data to ESP32
   size_t write(const char* data) {
-    return (serial_ != nullptr) ? serial_->print(data) : 0;
+    if (use_hardware_serial_) {
+      return Serial.print(data);
+    }
+    return (software_serial_ != nullptr) ? software_serial_->print(data) : 0;
   }
 
   // Read a line from serial (up to newline or buffer size)
   bool readLine(char* buffer, size_t buffer_size, uint16_t timeout_ms = 1000) {
-    if (serial_ == nullptr) return false;
+    Stream* serial = getSerial();
+    if (serial == nullptr) return false;
     
     unsigned long start = millis();
     size_t index = 0;
     
     while (millis() - start < timeout_ms && index < buffer_size - 1) {
-      if (serial_->available()) {
-        char c = serial_->read();
+      if (serial->available()) {
+        char c = serial->read();
         if (c == '\n') {
           buffer[index] = '\0';
           return true;
@@ -164,10 +217,15 @@ class WifiBridge {
     unsigned long start = millis();
     
     while (millis() - start < timeout_ms) {
-      if (readLine(buffer, sizeof(buffer), timeout_ms - (millis() - start))) {
+      unsigned long elapsed = millis() - start;
+      uint16_t remaining_timeout = (elapsed < timeout_ms) ? (timeout_ms - elapsed) : 0;
+      
+      if (remaining_timeout > 0 && readLine(buffer, sizeof(buffer), remaining_timeout)) {
         if (strstr(buffer, expected) != nullptr) {
           return true;
         }
+      } else {
+        break;  // Timeout reached
       }
     }
     return false;
@@ -181,6 +239,7 @@ class WifiBridge {
   uint8_t rx_pin_;
   uint8_t tx_pin_;
   long baud_rate_;
-  SoftwareSerial* serial_;
+  bool use_hardware_serial_;
+  SoftwareSerial* software_serial_;
   bool connected_;
 };

@@ -19,7 +19,7 @@ If the upload succeeds, the onboard LED should blink and the monitor will print 
 | Omni grayscale array + 2 IR obstacle sensors | Read through 74HC165 on D7 (data), D8 (clock), D9 (latch) | - |
 | RGB LED strips | Channels on pins 12 (G), 13 (R), 11 (B) | `rgb_led.h` |
 | IR receiver | Connected to D2 | - |
-| ESP32-CAM module | WiFi bridge via UART (RX=10, TX=11 by default) | `wifi.h` |
+| ESP32-CAM module | WiFi bridge via Hardware Serial (D0/D1); disconnect during upload | `wifi.h` |
 
 ## Available Component Libraries
 

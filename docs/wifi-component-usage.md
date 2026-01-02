@@ -6,12 +6,11 @@ The WiFi component (`wifi.h`) provides a bridge to communicate with the ESP32-CA
 
 ## Hardware Setup
 
-- **ESP32-CAM**: Connected to the Arduino Uno via UART
-- **Communication**: Uses SoftwareSerial (recommended) or Hardware Serial
-- **Default Pins**: RX=10, TX=11 (configurable)
+- **ESP32-CAM**: Connected to Arduino Uno via Hardware Serial (D0/D1 - UART)
+- **Communication**: Hardware Serial by default (as per Zeus Car Shield wiring), SoftwareSerial supported for custom wiring
 - **Baud Rate**: 9600 (configurable)
 
-**Important**: If using hardware serial (pins 0,1), disconnect the ESP32-CAM during Arduino sketch upload to avoid conflicts with USB programming.
+**Important**: The ESP32-CAM is connected to hardware serial pins (D0/D1) which are also used for USB programming. Disconnect the ESP32-CAM during Arduino sketch upload to avoid conflicts with USB programming.
 
 ## ESP32-CAM Firmware Requirements
 
@@ -28,29 +27,70 @@ The ESP32 should respond with:
 - IP address string for GET_IP
 - HTTP response data for HTTP_GET/POST
 
-## Basic Usage Example
+## Basic Usage Example (Hardware Serial - Default)
 
 ```cpp
 #include <Arduino.h>
 #include "wifi.h"
 
-// Create WiFi bridge instance
-// Parameters: RX pin, TX pin, baud rate
-WifiBridge wifi(10, 11, 9600);
+// Create WiFi bridge instance using hardware serial (default)
+WifiBridge wifi(9600);  // Baud rate parameter only
 
 void setup() {
-  Serial.begin(9600);
+  // Note: WiFi bridge will initialize Serial in begin()
+  // Do not call Serial.begin() separately when using hardware serial mode
   
   // Initialize WiFi bridge
   wifi.begin();
   delay(1000);
   
   // Connect to WiFi network
+  if (wifi.connect("YourSSID", "YourPassword", 15000)) {
+    // Connected! Note: Serial is now used for ESP32 communication
+    
+    // Get IP address
+    char ip[16];
+    if (wifi.getIpAddress(ip, sizeof(ip))) {
+      // Successfully got IP
+    }
+  }
+}
+
+void loop() {
+  if (wifi.isConnected()) {
+    // Send HTTP GET request
+    char response[256];
+    if (wifi.httpGet("http://api.example.com/data", response, sizeof(response))) {
+      // Process response
+    }
+    
+    delay(5000);
+  }
+}
+```
+
+## Alternative: Using Software Serial for Custom Wiring
+
+If you have custom wiring or need to use Serial for debugging:
+
+```cpp
+#include <Arduino.h>
+#include "wifi.h"
+
+// Create WiFi bridge with custom pins (RX, TX, baud_rate)
+// Choose pins that don't conflict with other components
+WifiBridge wifi(8, 9, 9600);  // RX=8, TX=9, baud=9600
+
+void setup() {
+  Serial.begin(9600);  // Now you can use Serial for debugging
+  
+  wifi.begin();
+  delay(1000);
+  
   Serial.println("Connecting to WiFi...");
   if (wifi.connect("YourSSID", "YourPassword", 15000)) {
     Serial.println("Connected to WiFi!");
     
-    // Get IP address
     char ip[16];
     if (wifi.getIpAddress(ip, sizeof(ip))) {
       Serial.print("IP Address: ");
@@ -63,7 +103,6 @@ void setup() {
 
 void loop() {
   if (wifi.isConnected()) {
-    // Send HTTP GET request
     char response[256];
     if (wifi.httpGet("http://api.example.com/data", response, sizeof(response))) {
       Serial.print("Response: ");
@@ -115,13 +154,17 @@ while (wifi.available()) {
 
 ## API Reference
 
-### Constructor
+### Constructors
 
 ```cpp
-WifiBridge(uint8_t rx_pin = 10, uint8_t tx_pin = 11, long baud_rate = 9600)
+// Hardware Serial mode (default, for Zeus Car Shield wiring)
+WifiBridge(long baud_rate = 9600)
+
+// Software Serial mode (for custom wiring)
+WifiBridge(uint8_t rx_pin, uint8_t tx_pin, long baud_rate = 9600)
 ```
 
-Creates a WiFi bridge instance with specified pins and baud rate.
+Creates a WiFi bridge instance. The first constructor uses hardware serial (D0/D1) which matches the Zeus Car Shield wiring. The second constructor allows custom pins with SoftwareSerial.
 
 ### Methods
 
