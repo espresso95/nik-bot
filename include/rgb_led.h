@@ -14,9 +14,9 @@ class RgbLed {
   }
 
   void setColor(bool red, bool green, bool blue) {
-    digitalWrite(Pins::kRgbRed, red ? HIGH : LOW);
-    digitalWrite(Pins::kRgbGreen, green ? HIGH : LOW);
-    digitalWrite(Pins::kRgbBlue, blue ? HIGH : LOW);
+    setPin(Pins::kRgbRed, red);
+    setPin(Pins::kRgbGreen, green);
+    setPin(Pins::kRgbBlue, blue);
   }
 
   void on() { setColor(true, true, true); }
@@ -32,5 +32,9 @@ class RgbLed {
   }
 
  private:
+  void setPin(uint8_t pin, bool state) {
+    digitalWrite(pin, state ? HIGH : LOW);
+  }
+  
   bool is_on_ = false;
 };

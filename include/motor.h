@@ -16,17 +16,17 @@ class Motor {
 
   void forward(uint8_t speed = 255) {
     if (inverted_) {
-      reverseInternal(speed);
+      setMotorDirection(pin_b_, pin_a_, speed);
     } else {
-      forwardInternal(speed);
+      setMotorDirection(pin_a_, pin_b_, speed);
     }
   }
 
   void reverse(uint8_t speed = 255) {
     if (inverted_) {
-      forwardInternal(speed);
+      setMotorDirection(pin_a_, pin_b_, speed);
     } else {
-      reverseInternal(speed);
+      setMotorDirection(pin_b_, pin_a_, speed);
     }
   }
 
@@ -36,23 +36,13 @@ class Motor {
   }
 
  private:
-  void forwardInternal(uint8_t speed) {
+  void setMotorDirection(uint8_t active_pin, uint8_t inactive_pin, uint8_t speed) {
+    digitalWrite(inactive_pin, LOW);
+    
     if (pwm_capable_ && speed < 255) {
-      analogWrite(pin_a_, speed);
-      digitalWrite(pin_b_, LOW);
+      analogWrite(active_pin, speed);
     } else {
-      digitalWrite(pin_a_, HIGH);
-      digitalWrite(pin_b_, LOW);
-    }
-  }
-
-  void reverseInternal(uint8_t speed) {
-    if (pwm_capable_ && speed < 255) {
-      digitalWrite(pin_a_, LOW);
-      analogWrite(pin_b_, speed);
-    } else {
-      digitalWrite(pin_a_, LOW);
-      digitalWrite(pin_b_, HIGH);
+      digitalWrite(active_pin, HIGH);
     }
   }
 

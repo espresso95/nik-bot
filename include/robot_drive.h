@@ -13,45 +13,29 @@ class MotorController {
         motor4_(Pins::kMotorOutA4, Pins::kMotorOutB4, false, false) {} // Right back
 
   void begin() {
-    motor1_.begin();
-    motor2_.begin();
-    motor3_.begin();
-    motor4_.begin();
+    applyToAllMotors([](Motor& motor) { motor.begin(); });
   }
 
   void forward(uint8_t speed = 255) {
-    motor1_.forward(speed);
-    motor2_.forward(speed);
-    motor3_.forward(speed);
-    motor4_.forward(speed);
+    applyToAllMotors([speed](Motor& motor) { motor.forward(speed); });
   }
 
   void reverse(uint8_t speed = 255) {
-    motor1_.reverse(speed);
-    motor2_.reverse(speed);
-    motor3_.reverse(speed);
-    motor4_.reverse(speed);
+    applyToAllMotors([speed](Motor& motor) { motor.reverse(speed); });
   }
 
   void turnLeft(uint8_t speed = 255) {
-    motor1_.reverse(speed);
-    motor3_.reverse(speed);
-    motor2_.forward(speed);
-    motor4_.forward(speed);
+    left_motors_.reverse(speed);
+    right_motors_.forward(speed);
   }
 
   void turnRight(uint8_t speed = 255) {
-    motor1_.forward(speed);
-    motor3_.forward(speed);
-    motor2_.reverse(speed);
-    motor4_.reverse(speed);
+    left_motors_.forward(speed);
+    right_motors_.reverse(speed);
   }
 
   void stop() {
-    motor1_.stop();
-    motor2_.stop();
-    motor3_.stop();
-    motor4_.stop();
+    applyToAllMotors([](Motor& motor) { motor.stop(); });
   }
 
   // Individual motor access if needed
@@ -61,8 +45,34 @@ class MotorController {
   Motor& motor4() { return motor4_; }
 
  private:
+  struct MotorPair {
+    Motor& front;
+    Motor& back;
+    
+    void forward(uint8_t speed) {
+      front.forward(speed);
+      back.forward(speed);
+    }
+    
+    void reverse(uint8_t speed) {
+      front.reverse(speed);
+      back.reverse(speed);
+    }
+  };
+
+  template<typename Func>
+  void applyToAllMotors(Func operation) {
+    operation(motor1_);
+    operation(motor2_);
+    operation(motor3_);
+    operation(motor4_);
+  }
+
   Motor motor1_;
   Motor motor2_;
   Motor motor3_;
   Motor motor4_;
+  
+  MotorPair left_motors_{motor1_, motor3_};
+  MotorPair right_motors_{motor2_, motor4_};
 };
