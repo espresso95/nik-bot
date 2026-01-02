@@ -13,7 +13,7 @@ void setup() {
 void loop() {
   rgb.setGreen();
   motors.forward(200);
-  delay(2000);
+  delay(500);
   
   motors.stop();
   rgb.off();
@@ -21,7 +21,7 @@ void loop() {
   
   rgb.setRed();
   motors.reverse(200);
-  delay(2000);
+  delay(500);
   
   motors.stop();
   rgb.off();

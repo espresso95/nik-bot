@@ -6,9 +6,9 @@
 // Controls all 4 motors for robot drive system
 class MotorController {
  public:
-  RobotDrive()
-      : motor1_(Pins::kMotorOutA1, Pins::kMotorOutB1, true, true),   // Left front, inverted
-        motor2_(Pins::kMotorOutA2, Pins::kMotorOutB2, true, false),  // Right front
+  MotorController()
+      : motor1_(Pins::kMotorOutA1, Pins::kMotorOutB1, true, false),  // Left front
+        motor2_(Pins::kMotorOutA2, Pins::kMotorOutB2, true, true),   // Right front, inverted
         motor3_(Pins::kMotorOutA3, Pins::kMotorOutB3, false, true),  // Left back, inverted
         motor4_(Pins::kMotorOutA4, Pins::kMotorOutB4, false, false) {} // Right back
 
