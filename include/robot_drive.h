@@ -7,10 +7,10 @@
 class MotorController {
  public:
   MotorController()
-      : motor1_(Pins::kMotorOutA1, Pins::kMotorOutB1, true, false),  // Left front
-        motor2_(Pins::kMotorOutA2, Pins::kMotorOutB2, true, true),   // Right front, inverted
-        motor3_(Pins::kMotorOutA3, Pins::kMotorOutB3, false, true),  // Left back, inverted
-        motor4_(Pins::kMotorOutA4, Pins::kMotorOutB4, false, false) {} // Right back
+      : motor1_(Pins::kMotorOutA1, Pins::kMotorOutB1, true, false),  // Left front (pin B1 not PWM capable)
+        motor2_(Pins::kMotorOutA2, Pins::kMotorOutB2, true, true),    // Right front, inverted (both pins PWM)
+        motor3_(Pins::kMotorOutA3, Pins::kMotorOutB3, true, true),   // Left back, inverted
+        motor4_(Pins::kMotorOutA4, Pins::kMotorOutB4, true, false) {} // Right back
 
   void begin() {
     applyToAllMotors([](Motor& motor) { motor.begin(); });
