@@ -15,12 +15,10 @@ void setup() {
 
 void loop() {
   // Check for obstacles before moving
-  if (ultrasonic.isObstacleWithin(5)) {
+  while (ultrasonic.isObstacleWithin(5)) {
     rgb.setRed();
     motors.stop();
-    delay(1000);
-    rgb.off();
-    return;
+    delay(100);  // Check every 100ms
   }
   
   rgb.setGreen();
